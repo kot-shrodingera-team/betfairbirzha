@@ -9,6 +9,7 @@ import {
   getSumFromCoupon,
   getParameterFromCoupon,
 } from '../getInfo';
+import showStake from '../showStake';
 
 const getStakeInfo = (): string => {
   worker.StakeInfo.Auth = checkLogin();
@@ -20,6 +21,9 @@ const getStakeInfo = (): string => {
   worker.StakeInfo.MaxSumm = getMaximumStake();
   worker.StakeInfo.Summ = getSumFromCoupon();
   worker.StakeInfo.Parametr = getParameterFromCoupon();
+  if (getStakeCount() !== 1) {
+    showStake();
+  }
   return JSON.stringify(worker.StakeInfo);
 };
 

@@ -35,7 +35,7 @@ const showStake = async (): Promise<void> => {
     worker.Islogin = true;
     worker.JSLogined();
   }
-  updateBalance();
+  await updateBalance();
 
   const pageContent = await getElement('.page-content');
   if (!pageContent) {

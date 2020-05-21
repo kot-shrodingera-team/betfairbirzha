@@ -15,9 +15,9 @@ import {
   betNameSelector,
 } from './selectors';
 import {
-  getCoefficientFromLay,
+  invertCoefficient,
   getCoefIncludingCommission,
-  convertToLaySum,
+  getRawCoefficientFromCupon,
 } from './coefficientConvertions';
 import { round } from './util';
 
@@ -43,20 +43,18 @@ export const getCoefficientFromCoupon = (): number => {
   if (window.stakeData.isFake) {
     return window.stakeData.fakeCoefficient;
   }
-  window.stakeData.rawCoefficient = getCoefficientFromCoupon();
+  window.stakeData.rawCoefficient = getRawCoefficientFromCupon();
+  let botCoefficient: number;
   if (window.stakeData.isLay) {
-    window.stakeData.layCoefficient = getCoefficientFromLay(
-      window.stakeData.rawCoefficient
-    );
-    window.stakeData.realCoefficient = getCoefIncludingCommission(
-      window.stakeData.layCoefficient
+    botCoefficient = getCoefIncludingCommission(
+      invertCoefficient(window.stakeData.rawCoefficient)
     );
   } else {
-    window.stakeData.realCoefficient = getCoefIncludingCommission(
+    botCoefficient = getCoefIncludingCommission(
       window.stakeData.rawCoefficient
     );
   }
-  return window.stakeData.realCoefficient;
+  return botCoefficient;
 };
 
 export const getBalance = (): number => {
@@ -65,29 +63,16 @@ export const getBalance = (): number => {
     worker.Helper.WriteLine('Ошибка получения баланса: Не найден баланс');
     return -1;
   }
-  const balanceText = balanceElement.textContent.replace(',', '');
-  if (!/^[$€]\d+\.\d+/.test(balanceText)) {
+  const balanceText = balanceElement.textContent.trim();
+  const balance = Number(balanceText.replace(',', '').substr(1));
+  if (!balance) {
     worker.Helper.WriteLine(
       `Ошибка получения баланса: Непонятный формат баланса - ${balanceText}`
     );
     return -1;
   }
-  let balance;
-  try {
-    balance = parseFloat(balanceText.substr(1));
-  } catch (e) {
-    worker.Helper.WriteLine(
-      `Ошибка получения баланса: Не удалось спарсить - ${e}`
-    );
-    return -1;
-  }
-  // Если продаём часть ставки, нужно скорректировать баланс, иначе бот может решить, что нельзя сделать ставку
+  // Если фейковая (частичная) ставка, нужно скорректировать баланс, иначе бот может решить, что не хватит баланса
   if (window.stakeData.isFake) {
-    // if (stakeData.isLay) {
-    //     return parseFloat((balance + convertToLaySum(stakeData.fakeSum, stakeData.rawCoefficient)).toFixed(2));
-    // } else {
-    //     return parseFloat((balance + stakeData.fakeSum).toFixed(2));
-    // }
     return round(balance + window.stakeData.fakeSum);
   }
   return balance;
@@ -101,7 +86,7 @@ const balanceOk = async (): Promise<boolean> => {
   }
   return awaiter(
     () =>
-      /^[$€]\d+\.\d+&/.test(balanceElement.textContent.trim().replace(',', '')),
+      /^[$€]\d+\.\d+$/.test(balanceElement.textContent.trim().replace(',', '')),
     10000
   );
 };
@@ -119,18 +104,13 @@ export const getMinimumStake = (): number => {
     return 0;
   }
   if (window.stakeData.isLay) {
-    return round(3 / (window.stakeData.layCoefficient - 1));
+    return round(3 * (window.stakeData.rawCoefficient - 1));
   }
   return 3;
 };
 
 export const getMaximumStake = (): number => {
   if (window.stakeData.isFake) {
-    // if (stakeData.isLay) {
-    //     return convertToLaySum(stakeData.fakeSum, stakeData.rawCoefficient);
-    // } else {
-    //     return stakeData.fakeSum;
-    // }
     return window.stakeData.fakeSum;
   }
   if (!window.currentStakeButton) {
@@ -146,27 +126,21 @@ export const getMaximumStake = (): number => {
     );
     return -1;
   }
-  try {
-    const rawMax = Number(size.substr(1));
-    if (window.stakeData.isLay) {
-      return convertToLaySum(rawMax, window.stakeData.rawCoefficient);
-    }
-    return rawMax;
-  } catch (e) {
+  const rawMax = Number(size.substr(1));
+  if (!rawMax) {
     worker.Helper.WriteLine(
-      `Ошибка получения максимальной ставки: Не удалось спарсить - ${e}`
+      `Ошибка получения максимальной ставки: Не удалось спарсить - ${size}`
     );
     return -1;
   }
+  if (window.stakeData.isLay) {
+    return round(rawMax * (window.stakeData.rawCoefficient - 1));
+  }
+  return rawMax;
 };
 
 export const getSumFromCoupon = (): number => {
   if (window.stakeData.isFake) {
-    // if (stakeData.isLay) {
-    //     return convertToLaySum(stakeData.fakeSum, stakeData.rawCoefficient);
-    // } else {
-    //     return stakeData.fakeSum;
-    // }
     return window.stakeData.fakeSum;
   }
   const stakeSumInput = document.querySelector(
@@ -176,20 +150,19 @@ export const getSumFromCoupon = (): number => {
     worker.Helper.WriteLine(
       'Ошибка получения текущей суммы ставки: Не найдено поле ввода суммы ставки'
     );
-    return NaN;
+    return -1;
   }
-  try {
-    const value = parseFloat(stakeSumInput.value);
-    if (window.stakeData.isLay) {
-      return value / (window.stakeData.layCoefficient - 1);
-    }
-    return value;
-  } catch (e) {
+  const value = Number(stakeSumInput.value);
+  if (Number.isNaN(value)) {
     worker.Helper.WriteLine(
-      `Ошибка получения текущей суммы ставки: Не удалось спарсить - ${e}`
+      `Ошибка получения текущей суммы ставки: Не удалось спарсить - '${stakeSumInput.value}'`
     );
-    return NaN;
+    return -1;
   }
+  if (window.stakeData.isLay) {
+    return round(value * window.stakeData.rawCoefficient);
+  }
+  return value;
 };
 
 const isBetNameOfMatchOdds = (betName: string, teams: string[]): boolean => {
@@ -256,8 +229,8 @@ export const getParameterFromCoupon = (): number => {
     competition = competitionElement.textContent.trim();
     worker.Helper.WriteLine(`Заголовок соревнования (лиги) - '${competition}'`);
   }
-  const teams =
-    competition === 'NHL Matches'
+  const teams = 
+    teamsString.split(' @ ').length === 2
       ? teamsString.split(' @ ')
       : teamsString.split(' v ');
   if (teams.length !== 2) {
@@ -281,15 +254,6 @@ export const getParameterFromCoupon = (): number => {
     if ((match = betName.match(`^(?:Under|Over) (\\d+\\.\\d+)(?: Goals)?$`))) {
       worker.Helper.WriteLine(`Тип ставки - Тотал. Параметр = ${match[1]}`);
       return parseFloat(match[1]);
-    }
-    if (
-      (match = betName.match(`^(.*) ${handicapParameterRegex}$`)) &&
-      isBetNameOfMatchOdds(match[1], teams)
-    ) {
-      worker.Helper.WriteLine(`Тип ставки - Фора. Параметр = ${match[2]}`);
-      return window.stakeData.isLay
-        ? -parseFloat(match[2])
-        : parseFloat(match[2]);
     }
     if (
       (match = betName.match(
@@ -316,6 +280,15 @@ export const getParameterFromCoupon = (): number => {
       return window.stakeData.isLay
         ? -resultHandicapParameter
         : resultHandicapParameter;
+    }
+    if (
+      (match = betName.match(`^(.*) ${handicapParameterRegex}$`)) &&
+      isBetNameOfMatchOdds(match[1], teams)
+    ) {
+      worker.Helper.WriteLine(`Тип ставки - Фора. Параметр = ${match[2]}`);
+      return window.stakeData.isLay
+        ? -parseFloat(match[2])
+        : parseFloat(match[2]);
     }
     if (betName === 'Home or Draw') {
       worker.Helper.WriteLine(`Тип ставки - Double Chance 1X (Без параметра)`);

@@ -23,7 +23,7 @@ export const checkLoginAsync = async (): Promise<boolean> => {
 };
 
 export const languageCheck = async (): Promise<boolean> => {
-  const languageIcon = await getElement(languageIconSelector);
+  const languageIcon = await getElement(languageIconSelector, 10000);
   if (!languageIcon) {
     worker.Helper.WriteLine('Не найдена иконка текущего языка');
     return false;

@@ -1,9 +1,8 @@
 import { fireEvent } from '@kot-shrodingera-team/config/util';
 import { stakeSumInputSelector } from '../selectors';
-import { convertToLaySum } from '../coefficientConvertions';
+import { round } from '../util';
 
 const setStakeSum = (sum: number): boolean => {
-  console.log(`setStakeSumm(${sum})`);
   worker.Helper.WriteLine(`Сумма ставки в боте - ${sum}`);
   if (window.stakeData.isFake) {
     return true;
@@ -18,16 +17,14 @@ const setStakeSum = (sum: number): boolean => {
     return false;
   }
   if (window.stakeData.isLay) {
-    const laySum = convertToLaySum(sum, window.stakeData.layCoefficient);
-    worker.Helper.WriteLine(`Сумма lay ставки - ${laySum}`);
-    stakeSumInput.value = String(laySum);
-    window.stakeData.laySum = laySum;
-    // window.stakeData.sum = laySum;
+    const backSum = round(sum / (window.stakeData.rawCoefficient - 1));
+    worker.Helper.WriteLine(`Back сумма - ${backSum}`);
+    stakeSumInput.value = String(backSum);
+    window.stakeData.sum = backSum;
   } else {
     stakeSumInput.value = String(sum);
-    // window.stakeData.sum = sum;
+    window.stakeData.sum = sum;
   }
-  window.stakeData.sum = sum;
   fireEvent(stakeSumInput, 'input');
   return true;
 };

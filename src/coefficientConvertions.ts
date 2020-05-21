@@ -26,9 +26,13 @@ export const getRawCoefficientFromCupon = (): number => {
   }
 };
 
-export const getCoefficientFromLay = (coefficient: number): number => {
+export const invertCoefficient = (coefficient: number): number => {
   return round(coefficient / (coefficient - 1), 3);
 };
+
+// export const getCoefficientFromLay = (coefficient: number): number => {
+//   return round(coefficient / (coefficient - 1), 3);
+// };
 
 export const getCoefIncludingCommission = (coefficient: number): number => {
   if (coefficient === 0) {
