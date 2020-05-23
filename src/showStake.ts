@@ -127,6 +127,9 @@ const showStake = async (): Promise<void> => {
   if (window.stakeData.isNewBetslip) {
     await getElement(liabilitySelector, 1000);
   }
+  worker.Helper.WriteLine(
+    `Текущий макс (back): ${window.currentStakeButton.getAttribute('size')}`
+  );
   worker.JSStop();
 };
 

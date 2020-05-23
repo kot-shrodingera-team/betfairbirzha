@@ -94,7 +94,7 @@ const isCancelCompleted = (): boolean => {
       worker.Helper.WriteLine('CancelledBets');
     }
     if (unplacedBets) {
-      worker.Helper.WriteLine('UnnplacedBets');
+      worker.Helper.WriteLine('UnplacedBets');
     }
     return Boolean(cancelledBets) || Boolean(unplacedBets);
   }
@@ -152,7 +152,7 @@ const getStakedSum = (): number => {
     targetBets.reduce((sum, nextBet, index) => {
       const nextBetSumElement = nextBet.querySelector(receiptBetSizeSelector);
       if (!nextBetSumElement) {
-        worker.Helper.WriteLine(`Не найдена сумма ${index - 1} ставки в игре`);
+        worker.Helper.WriteLine(`Не найдена сумма ${index + 1} ставки в игре`);
         return sum;
       }
       return sum + Number(nextBetSumElement.textContent.slice(1).trim());
@@ -210,6 +210,19 @@ const checkCouponLoading = (): boolean => {
       isCancelling = true;
       return true;
     }
+    if (stakePlaceResult === StakePlaceResult.ERROR) {
+      if (stakedSum === window.stakeData.sum) {
+        window.stakeData.stakePlaced = true;
+        return false;
+      }
+      fakeStake(stakedSum);
+      if (!cancellUnmatchedBets()) {
+        window.stakeData.enabled = false;
+        return false;
+      }
+      isCancelling = true;
+      return true;
+    }
   }
 
   loadingCount += 1;
@@ -217,6 +230,16 @@ const checkCouponLoading = (): boolean => {
   if (isCancelling) {
     if (loadingCount > 20) {
       worker.Helper.WriteLine('Зависла отмена');
+      const goToOpenBetsResult = goToOpenBets();
+      if (goToOpenBetsResult) {
+        worker.Helper.WriteLine('Переходим к открытым ставкам');
+        openBetsDelay = true;
+        return true;
+      }
+      worker.Helper.WriteLine('Не удалось перейти к открытым ставкам');
+      const openBetsTab = document.querySelector(openBetsTabSelector);
+      console.log('openBetsTab');
+      console.log(openBetsTab);
     }
     const completed = isCancelCompleted();
     if (!completed) {
@@ -243,6 +266,16 @@ const checkCouponLoading = (): boolean => {
   if (stakePlaceResult === StakePlaceResult.ERROR) {
     if (loadingCount > 20) {
       worker.Helper.WriteLine('Зависла зависла обработка');
+      const goToOpenBetsResult = goToOpenBets();
+      if (goToOpenBetsResult) {
+        worker.Helper.WriteLine('Переходим к открытым ставкам');
+        openBetsDelay = true;
+        return true;
+      }
+      worker.Helper.WriteLine('Не удалось перейти к открытым ставкам');
+      const openBetsTab = document.querySelector(openBetsTabSelector);
+      console.log('openBetsTab');
+      console.log(openBetsTab);
     }
     worker.Helper.WriteLine('Обработка ставки');
     return true;
