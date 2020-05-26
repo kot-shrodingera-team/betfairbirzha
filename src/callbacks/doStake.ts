@@ -6,6 +6,7 @@ import {
 } from '../selectors';
 import { getRawCoefficientFromCupon } from '../coefficientConvertions';
 import { round } from '../util';
+import { clearLoadingCount } from './checkCouponLoading';
 
 // export const getCurrentLiability = (): number => {
 //   const liabilityElement = document.querySelector(liabilitySelector);
@@ -82,6 +83,7 @@ const doStake = (): boolean => {
     worker.Helper.WriteLine('Выключаем подтверждение ставки');
     betConfirmCheckbox.click();
   }
+  clearLoadingCount();
   worker.Helper.WriteLine('Нажимаем на кнопку принятия ставки');
   submitButton.click();
   return true;

@@ -229,7 +229,7 @@ export const getParameterFromCoupon = (): number => {
     competition = competitionElement.textContent.trim();
     worker.Helper.WriteLine(`Заголовок соревнования (лиги) - '${competition}'`);
   }
-  const teams = 
+  const teams =
     teamsString.split(' @ ').length === 2
       ? teamsString.split(' @ ')
       : teamsString.split(' v ');

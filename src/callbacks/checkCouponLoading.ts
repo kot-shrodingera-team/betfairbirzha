@@ -28,6 +28,10 @@ let loadingCount = 0;
 let openBetsDelay = false;
 let stakePlaceResult = StakePlaceResult.ERROR;
 
+export const clearLoadingCount = (): void => {
+  loadingCount = 0;
+};
+
 const fakeStake = (stakedSum: number): void => {
   window.stakeData.isFake = true;
   window.stakeData.fakeEvent = `${worker.TeamOne} - ${worker.TeamTwo}`;
@@ -265,7 +269,7 @@ const checkCouponLoading = (): boolean => {
   stakePlaceResult = getStakePlaceResult();
   if (stakePlaceResult === StakePlaceResult.ERROR) {
     if (loadingCount > 20) {
-      worker.Helper.WriteLine('Зависла зависла обработка');
+      worker.Helper.WriteLine('Зависла обработка');
       const goToOpenBetsResult = goToOpenBets();
       if (goToOpenBetsResult) {
         worker.Helper.WriteLine('Переходим к открытым ставкам');
