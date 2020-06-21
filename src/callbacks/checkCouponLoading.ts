@@ -28,6 +28,14 @@ let loadingCount = 0;
 let openBetsDelay = false;
 let stakePlaceResult = StakePlaceResult.ERROR;
 
+export const clearLoadingStakeData = (): void => {
+  refId = 0;
+  isCancelling = false;
+  loadingCount = 0;
+  openBetsDelay = false;
+  stakePlaceResult = StakePlaceResult.ERROR;
+};
+
 export const clearLoadingCount = (): void => {
   loadingCount = 0;
 };

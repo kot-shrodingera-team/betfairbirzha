@@ -1,10 +1,6 @@
-import { getElement, awaiter, sleep } from '@kot-shrodingera-team/config/util';
+import { getElement, sleep } from '@kot-shrodingera-team/config/util';
 import { updateBalance, getStakeCount } from './getInfo';
 import { languageCheck, changeLanguage, checkLoginAsync } from './authorize';
-import {
-  cancelAllSelectionsButtonSelector,
-  liabilitySelector,
-} from './selectors';
 
 const showStake = async (): Promise<void> => {
   if (!(await languageCheck())) {
@@ -46,31 +42,31 @@ const showStake = async (): Promise<void> => {
     return;
   }
   // Костыль. По-хорошему явно определять, когда появились ставки и купон
-  await sleep(500);
-  console.log(`stakeCount = ${getStakeCount()}`);
-  if (getStakeCount() !== 0) {
-    worker.Helper.WriteLine('В купоне есть ставки. Очищаем');
-    const cancelAllSelectionsButton = document.querySelector(
-      cancelAllSelectionsButtonSelector
-    ) as HTMLElement;
-    if (!cancelAllSelectionsButton) {
-      worker.Helper.WriteLine(
-        'Ошибка открытия купона: Не найдена кнопка очистки купона'
-      );
-      worker.JSFail();
-      return;
-    }
-    cancelAllSelectionsButton.click();
-    if (!(await awaiter(() => getStakeCount() === 0))) {
-      worker.Helper.WriteLine(
-        'Ошибка открытия купона: Не удалось очистить купон'
-      );
-      worker.JSFail();
-      return;
-    }
-  }
-  const betSelectionId = betData[2];
-  const betHandicap = parseFloat(betData[3]);
+  // await sleep(500);
+  // console.log(`stakeCount = ${getStakeCount()}`);
+  // if (getStakeCount() !== 0) {
+  //   worker.Helper.WriteLine('В купоне есть ставки. Очищаем');
+  //   const cancelAllSelectionsButton = document.querySelector(
+  //     cancelAllSelectionsButtonSelector
+  //   ) as HTMLElement;
+  //   if (!cancelAllSelectionsButton) {
+  //     worker.Helper.WriteLine(
+  //       'Ошибка открытия купона: Не найдена кнопка очистки купона'
+  //     );
+  //     worker.JSFail();
+  //     return;
+  //   }
+  //   cancelAllSelectionsButton.click();
+  //   if (!(await awaiter(() => getStakeCount() === 0))) {
+  //     worker.Helper.WriteLine(
+  //       'Ошибка открытия купона: Не удалось очистить купон'
+  //     );
+  //     worker.JSFail();
+  //     return;
+  //   }
+  // }
+  const betSelectionId = betData[1];
+  const betHandicap = betData[2] === 'null' ? 0 : betData[2];
   const mainContainer = await getElement('.main-mv-container');
   if (!mainContainer) {
     worker.Helper.WriteLine(
@@ -124,9 +120,9 @@ const showStake = async (): Promise<void> => {
   worker.Helper.WriteLine('Нажимаем на ставку');
   window.currentStakeButton.click();
   console.log(`stakeCount = ${getStakeCount()}`);
-  if (window.stakeData.isNewBetslip) {
-    await getElement(liabilitySelector, 1000);
-  }
+  // if (window.stakeData.isNewBetslip) {
+  //   await getElement(liabilitySelector, 1000);
+  // }
   worker.Helper.WriteLine(
     `Текущий макс (back): ${window.currentStakeButton.getAttribute('size')}`
   );
