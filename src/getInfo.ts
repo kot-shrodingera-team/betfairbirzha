@@ -169,7 +169,7 @@ const isBetNameOfMatchOdds = (betName: string, teams: string[]): boolean => {
   const teamsNormalized = teams.map((team) =>
     normalizeDiactric(team.replace(/-/g, ' '))
   );
-  const normalizedBetName = normalizeDiactric(betName);
+  const normalizedBetName = normalizeDiactric(betName.replace(/-/g, ' '));
   if (teamsNormalized.some((team) => ri`${team}`.test(normalizedBetName))) {
     return true;
   }
