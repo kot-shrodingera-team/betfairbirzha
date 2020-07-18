@@ -75,18 +75,31 @@ const showStake = async (): Promise<void> => {
     worker.JSFail();
     return;
   }
-  const betSelector =
+  const betSelectorWithoutHandicap =
+    `[bet-selection-id='${betSelectionId}']` +
+    `[bet-type='${betType}']` +
+    ` > button.${betType}-selection-button`;
+  const betsLoaded = await getElement(betSelectorWithoutHandicap);
+  if (!betsLoaded) {
+    if (!window.currentStakeButton) {
+      worker.Helper.WriteLine('Ошибка открытия купона: Ставка не найдена');
+      worker.JSFail();
+      return;
+    }
+  }
+  const betSelectorWithRealHandicap =
     `[bet-handicap='${betHandicap}']` +
     `[bet-selection-id='${betSelectionId}']` +
     `[bet-type='${betType}']` +
     ` > button.${betType}-selection-button`;
-  console.log(`betSelector = ${betSelector}`);
-  window.currentStakeButton = (await getElement(
-    betSelector,
-    1000,
-    mainContainer
-  )) as HTMLElement;
-
+  const betSelectorWithZeroHandicap =
+    `[bet-handicap='0']` +
+    `[bet-selection-id='${betSelectionId}']` +
+    `[bet-type='${betType}']` +
+    ` > button.${betType}-selection-button`;
+  window.currentStakeButton =
+    (document.querySelector(betSelectorWithRealHandicap) as HTMLElement) ||
+    (document.querySelector(betSelectorWithZeroHandicap) as HTMLElement);
   if (!window.currentStakeButton) {
     worker.Helper.WriteLine('Ошибка открытия купона: Ставка не найдена');
     worker.JSFail();
