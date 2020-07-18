@@ -1,5 +1,9 @@
 import './workerCheck';
-import { getElement, awaiter } from '@kot-shrodingera-team/config/util';
+import {
+  getElement,
+  awaiter,
+  pipeHwlToConsole,
+} from '@kot-shrodingera-team/config/util';
 import getStakeInfo from './callbacks/getStakeInfo';
 import setStakeSum from './callbacks/setStakeSum';
 import doStake from './callbacks/doStake';
@@ -12,6 +16,14 @@ import showStake from './showStake';
 import clearCoupon from './clearCoupon';
 import { getStakeCount } from './getInfo';
 import clearStakeData from './initializeStakeData';
+import {
+  getActiveTab,
+  goToPotentialBetsTab,
+  goToOpenBetsTab,
+  openBetsTabActiveSelector,
+} from './utils';
+
+pipeHwlToConsole();
 
 let hiddenLink: HTMLAnchorElement = null;
 clearStakeData();
@@ -50,15 +62,28 @@ const fastLoad = async (): Promise<void> => {
   }
   clearStakeData();
   clearLoadingStakeData();
-  if (document.querySelector('[selected-tab-id]')) {
-    if (!document.querySelector('[selected-tab-id="POTENTIAL"]')) {
-      const potentialTab = document.querySelector('.POTENTIAL') as HTMLElement;
-      if (!potentialTab) {
-        worker.Helper.WriteLine('Не найдена вкладка потенциальных ставок');
+  const betslip = document.querySelector('bf-betslip');
+  if (betslip) {
+    worker.Helper.WriteLine('Мы на странице с купоном');
+    if (getActiveTab() === 'potential') {
+      worker.Helper.WriteLine(
+        'На вкладке потенциальных ставок. Переходим на вкладку открытых ставок'
+      );
+      const goneToOpenBetsTab = await goToOpenBetsTab();
+      if (!goneToOpenBetsTab) {
         worker.JSFail();
         return;
       }
-      potentialTab.click();
+    }
+    if (getActiveTab() === 'open') {
+      worker.Helper.WriteLine(
+        'На вкладке открытых ставок. Переходим на вкладку потенциальных ставок'
+      );
+      const goneToPotentialBetsTab = await goToPotentialBetsTab();
+      if (!goneToPotentialBetsTab) {
+        worker.JSFail();
+        return;
+      }
     }
     const couponCleared = await clearCoupon();
     if (!couponCleared) {
@@ -73,40 +98,29 @@ const fastLoad = async (): Promise<void> => {
       body.insertBefore(hiddenLink, body.childNodes[0]);
     }
     hiddenLink.href = worker.EventUrl;
-    if (
-      document.querySelector('[selected-tab-id]') &&
-      !document.querySelector('[selected-tab-id="POTENTIAL"]')
-    ) {
-      const potentialTab = document.querySelector('.POTENTIAL') as HTMLElement;
-      if (!potentialTab) {
-        worker.Helper.WriteLine('Не найдена вкладка потенциальных ставок');
-        worker.JSFail();
-        return;
-      }
-      potentialTab.click();
-    }
+    worker.Helper.WriteLine('Переходим на новый маркет');
     hiddenLink.click();
+    // await sleep(1000);
+    // Ждём либо открытия вкладки открытых ставок, либо когда количество потенциальных ставок в купоне будет больше 0
     await Promise.race([
-      getElement('[selected-tab-id="OPEN"]'),
-      awaiter(() => getStakeCount() > 0, 5000),
+      getElement(openBetsTabActiveSelector),
+      awaiter(() => getStakeCount() > 0),
     ]);
-    console.log(`getStakeCount = ${getStakeCount()}`);
     if (getStakeCount() > 0) {
+      worker.Helper.WriteLine(
+        'Перешли на новый маркет. Есть ставки в купоне. Очищаем купон'
+      );
       const couponCleared = await clearCoupon();
       if (!couponCleared) {
         worker.JSFail();
         return;
       }
+    } else if (document.querySelector(openBetsTabActiveSelector)) {
+      worker.Helper.WriteLine('Успешно перешли на новый маркет');
     } else {
-      const openBetsOpened = await getElement('[selected-tab-id="OPEN"]');
-      if (!openBetsOpened) {
-        worker.Helper.WriteLine(
-          'Не дождались открытия вкладки открытых ставок'
-        );
-        worker.JSFail();
-        return;
-      }
-      worker.Helper.WriteLine('Новый маркет открыт');
+      worker.Helper.WriteLine('Не удалось перейти на новый маркет');
+      worker.JSFail();
+      return;
     }
   }
   showStake();

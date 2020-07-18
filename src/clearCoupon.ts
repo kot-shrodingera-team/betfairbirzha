@@ -19,6 +19,7 @@ const clearCoupon = async (): Promise<boolean> => {
       worker.Helper.WriteLine(
         'Ошибка открытия купона: Не удалось очистить купон'
       );
+
       return false;
     }
   }

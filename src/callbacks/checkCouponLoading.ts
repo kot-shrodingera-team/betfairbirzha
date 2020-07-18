@@ -27,6 +27,7 @@ let isCancelling = false;
 let loadingCount = 0;
 let openBetsDelay = false;
 let stakePlaceResult = StakePlaceResult.ERROR;
+let partialStakeNoOpenBetsCounter = 0;
 
 export const clearLoadingStakeData = (): void => {
   refId = 0;
@@ -34,6 +35,7 @@ export const clearLoadingStakeData = (): void => {
   loadingCount = 0;
   openBetsDelay = false;
   stakePlaceResult = StakePlaceResult.ERROR;
+  partialStakeNoOpenBetsCounter = 0;
 };
 
 export const clearLoadingCount = (): void => {
@@ -131,11 +133,11 @@ const cancellUnmatchedBets = (): boolean => {
   ) as HTMLElement;
   if (!cancelUnmatchedAboveButton) {
     worker.Helper.WriteLine('Не найдена кнопка отмены ставки');
-    window.stakeData.enabled = false;
     return false;
   }
   worker.Helper.WriteLine('Нажали на отмену ставки');
   cancelUnmatchedAboveButton.click();
+  clearLoadingCount();
   return true;
 };
 
@@ -175,8 +177,6 @@ const getStakedSum = (): number => {
 };
 
 const checkCouponLoading = (): boolean => {
-  worker.TakeScreenShot(false);
-
   if (openBetsDelay) {
     openBetsDelay = false;
     const stakedSum = getStakedSum();
@@ -191,9 +191,7 @@ const checkCouponLoading = (): boolean => {
         worker.Helper.WriteLine('Ставка полностью отменилась');
         window.currentStakeButton.click();
         window.stakeData.isFake = false; // Могло ли быть true до этого?
-        return false;
-      }
-      if (stakedSum === window.stakeData.sum) {
+      } else if (stakedSum === window.stakeData.sum) {
         worker.Helper.WriteLine('Ставка полностью принята');
         window.stakeData.stakePlaced = true;
       } else {
@@ -210,6 +208,20 @@ const checkCouponLoading = (): boolean => {
       return false;
     }
     if (stakePlaceResult === StakePlaceResult.PARTIAL) {
+      if (stakedSum === 0) {
+        if (partialStakeNoOpenBetsCounter === 10) {
+          worker.Helper.WriteLine(
+            'Ставки так и не появились, считаем ставку не сделанной'
+          );
+          return false;
+        }
+        worker.Helper.WriteLine(
+          'Нет ставок, хотя была частичная проставка. Ожидаем ещё'
+        );
+        partialStakeNoOpenBetsCounter += 1;
+        openBetsDelay = true;
+        return true;
+      }
       if (stakedSum === window.stakeData.sum) {
         window.stakeData.stakePlaced = true;
         return false;
@@ -240,34 +252,32 @@ const checkCouponLoading = (): boolean => {
   loadingCount += 1;
 
   if (isCancelling) {
-    if (loadingCount > 20) {
-      worker.Helper.WriteLine('Зависла отмена');
-      const goToOpenBetsResult = goToOpenBets();
-      if (goToOpenBetsResult) {
-        worker.Helper.WriteLine('Переходим к открытым ставкам');
-        openBetsDelay = true;
-        return true;
+    if (loadingCount > 200) {
+      worker.Helper.WriteLine('Зависла отмена. Переходим к открытым ставкам');
+      if (!goToOpenBets()) {
+        window.stakeData.enabled = false;
+        return false;
       }
-      worker.Helper.WriteLine('Не удалось перейти к открытым ставкам');
-      const openBetsTab = document.querySelector(openBetsTabSelector);
-      console.log('openBetsTab');
-      console.log(openBetsTab);
+      openBetsDelay = true;
+      return true;
     }
     const completed = isCancelCompleted();
     if (!completed) {
       worker.Helper.WriteLine('Ставка отменяется');
       return true;
     }
-    worker.Helper.WriteLine('Отмена ставки завершена');
+    worker.Helper.WriteLine(
+      'Отмена ставки завершена. Переходим к открытым ставкам'
+    );
+    worker.TakeScreenShot(false);
     // isCancelling = false;
 
-    if (goToOpenBets()) {
-      worker.Helper.WriteLine('Переходим к открытым ставкам');
-      openBetsDelay = true;
-      return true;
+    if (!goToOpenBets()) {
+      window.stakeData.enabled = false;
+      return false;
     }
-    window.stakeData.enabled = false;
-    return false;
+    openBetsDelay = true;
+    return true;
   }
 
   if (window.stakeData.isFake) {
@@ -276,23 +286,23 @@ const checkCouponLoading = (): boolean => {
 
   stakePlaceResult = getStakePlaceResult();
   if (stakePlaceResult === StakePlaceResult.ERROR) {
-    if (loadingCount > 20) {
-      worker.Helper.WriteLine('Зависла обработка');
-      const goToOpenBetsResult = goToOpenBets();
-      if (goToOpenBetsResult) {
-        worker.Helper.WriteLine('Переходим к открытым ставкам');
-        openBetsDelay = true;
-        return true;
+    if (loadingCount > 200) {
+      worker.Helper.WriteLine(
+        'Зависла обработка. Переходим к открытым ставкам'
+      );
+      worker.TakeScreenShot(false);
+      if (!goToOpenBets()) {
+        window.stakeData.enabled = false;
+        return false;
       }
-      worker.Helper.WriteLine('Не удалось перейти к открытым ставкам');
-      const openBetsTab = document.querySelector(openBetsTabSelector);
-      console.log('openBetsTab');
-      console.log(openBetsTab);
+      openBetsDelay = true;
+      return true;
     }
     worker.Helper.WriteLine('Обработка ставки');
     return true;
   }
   worker.Helper.WriteLine('Обработка ставки завершена');
+  worker.TakeScreenShot(false);
   if (stakePlaceResult === StakePlaceResult.MATCHED) {
     worker.Helper.WriteLine('Ставка принята');
     refId = getRefId();

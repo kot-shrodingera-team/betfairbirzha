@@ -1,10 +1,5 @@
 {
   "extends": "@kot-shrodingera-team/config",
-  "compilerOptions": {
-    "types": [
-      "@kot-shrodingera-team/config"
-    ]
-  },
   "include": [
     "./src/**/*.ts",
     "./node_modules/@kot-shrodingera-team/config/**/*.ts"
