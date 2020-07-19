@@ -100,6 +100,15 @@ const fastLoad = async (): Promise<void> => {
     hiddenLink.href = worker.EventUrl;
     worker.Helper.WriteLine('Переходим на новый маркет');
     hiddenLink.click();
+    const leaveMarketButton = document.querySelector(
+      '.nav-modal-dialog:not(.ng-hide) [ng-click="events.navigateAway()"]'
+    ) as HTMLElement;
+    if (leaveMarketButton) {
+      worker.Helper.WriteLine(
+        'Нажимаем на кнопку подтверждения перехода на новый маркет'
+      );
+      leaveMarketButton.click();
+    }
     // await sleep(1000);
     // Ждём либо открытия вкладки открытых ставок, либо когда количество потенциальных ставок в купоне будет больше 0
     await Promise.race([
