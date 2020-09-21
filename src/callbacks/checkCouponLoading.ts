@@ -28,6 +28,7 @@ let loadingCount = 0;
 let openBetsDelay = false;
 let stakePlaceResult = StakePlaceResult.ERROR;
 let partialStakeNoOpenBetsCounter = 0;
+let cancelledUnplaced = false;
 
 export const clearLoadingStakeData = (): void => {
   refId = 0;
@@ -36,6 +37,7 @@ export const clearLoadingStakeData = (): void => {
   openBetsDelay = false;
   stakePlaceResult = StakePlaceResult.ERROR;
   partialStakeNoOpenBetsCounter = 0;
+  cancelledUnplaced = false;
 };
 
 export const clearLoadingCount = (): void => {
@@ -188,6 +190,13 @@ const checkCouponLoading = (): boolean => {
     if (isCancelling) {
       isCancelling = false;
       if (stakedSum === 0) {
+        if (cancelledUnplaced) {
+          worker.Helper.WriteLine(
+            'Ставок в игре нет, но была ошибка Unplaced Bets. Считаем ставку принятой'
+          );
+          window.stakeData.stakePlaced = true;
+          return false;
+        }
         worker.Helper.WriteLine('Ставка полностью отменилась');
         window.currentStakeButton.click();
         window.stakeData.isFake = false; // Могло ли быть true до этого?
@@ -265,6 +274,9 @@ const checkCouponLoading = (): boolean => {
     if (!completed) {
       worker.Helper.WriteLine('Ставка отменяется');
       return true;
+    }
+    if (document.querySelector(unplacedBetsSelector)) {
+      cancelledUnplaced = true;
     }
     worker.Helper.WriteLine(
       'Отмена ставки завершена. Переходим к открытым ставкам'
