@@ -62,7 +62,8 @@ const fastLoad = async (): Promise<void> => {
   }
   clearStakeData();
   clearLoadingStakeData();
-  const betslip = document.querySelector('bf-betslip');
+  // const betslip = document.querySelector('bf-betslip');
+  const betslip = document.querySelector('betslip');
   if (betslip) {
     worker.Helper.WriteLine('Мы на странице с купоном');
     if (getActiveTab() === 'potential') {
