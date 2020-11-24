@@ -6,11 +6,12 @@ export const potentialBetsTabActiveSelector =
   'betslip ul.tabs-container > li.active.POTENTIAL, bf-betslip:not(.ng-hide) ul.generic-tabs-container > li.generic-tab-selected#betslip-tab-potential';
 
 export const isNewBetSlip = (): boolean => {
-  const betslip = document.querySelector('bf-betslip');
-  if (!betslip) {
-    return false;
-  }
-  return betslip.classList.contains('ng-hide');
+  return true;
+  // const betslip = document.querySelector('bf-betslip');
+  // if (!betslip) {
+  //   return false;
+  // }
+  // return betslip.classList.contains('ng-hide');
 };
 
 export const getActiveTab = (): string => {
