@@ -18,6 +18,7 @@ const checkStakeStatus = (): boolean => {
     window.stakeData.fakeReloaded = true;
     return false;
   }
+  worker.Helper.WriteLine('Ставка не принята');
   return false;
 };
 
