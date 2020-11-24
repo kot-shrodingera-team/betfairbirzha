@@ -152,11 +152,14 @@ const getStakedSum = (): number => {
   console.log('openBets');
   console.log(openBets);
   openBets.every((bet) => console.log(bet.outerHTML));
-  const targetBets = openBets.filter((bet) =>
-    ri`^Ref: ${String(refId)}$`.test(
-      bet.querySelector(openBetRefIdSelector).textContent.trim()
-    )
-  );
+  const targetBets = openBets.filter((bet) => {
+    const refIdElement = bet.querySelector(openBetRefIdSelector);
+    if (!refIdElement) {
+      worker.Helper.WriteLine('Не найден refId открытой ставки');
+      return false;
+    }
+    return ri`^Ref: ${String(refId)}$`.test(refIdElement.textContent.trim());
+  });
   console.log('targetBets');
   console.log(targetBets);
   if (targetBets.length === 0) {
