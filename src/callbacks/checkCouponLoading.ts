@@ -353,19 +353,19 @@ const checkCouponLoading = (): boolean => {
     return true;
   }
   if (stakePlaceResult === StakePlaceResult.PARTIAL) {
-    worker.Helper.WriteLine(`Ставка принято частично`);
+    worker.Helper.WriteLine(`Ставка принято частично, отменяем остаток`);
     refId = getRefId();
-    if (refId) {
-      if (goToOpenBets()) {
-        worker.Helper.WriteLine('Переходим к открытым ставкам');
-        openBetsDelay = true;
-        return true;
-      }
-    } else {
-      worker.Helper.WriteLine('Не найден refId');
+    if (!refId) {
+      worker.Helper.WriteLine('Ошибка определения RefId');
+      window.stakeData.enabled = false;
+      return false;
     }
-    window.stakeData.enabled = false;
-    return false;
+    if (!cancellUnmatchedBets()) {
+      window.stakeData.enabled = false;
+      return false;
+    }
+    isCancelling = true;
+    return true;
   }
   worker.Helper.WriteLine(`Неизвестный результат ставки`);
   return false;
