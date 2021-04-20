@@ -1,5 +1,7 @@
 interface StakeData {
   isLay: boolean;
+  betSelector: string;
+  openningBet: boolean;
   sum: number;
   isFake: boolean;
   fakeReloaded: boolean;

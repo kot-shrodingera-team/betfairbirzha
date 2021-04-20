@@ -1,6 +1,8 @@
 const clearStakeData = (): void => {
   window.stakeData = {
     isLay: false,
+    betSelector: null,
+    openningBet: false,
     sum: 0,
     isFake: false,
     fakeReloaded: false,

@@ -1,7 +1,6 @@
 import { updateBalance } from '../getInfo';
 
 const checkStakeStatus = (): boolean => {
-  console.log('checkStakeStatus()');
   if (window.stakeData.stakePlaced) {
     worker.Helper.WriteLine('Ставка принята');
     updateBalance();

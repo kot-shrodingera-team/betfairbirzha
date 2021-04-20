@@ -1,47 +1,42 @@
 import { ri } from '@kot-shrodingera-team/config/util';
+import { convertToLaySum } from '../coefficientConvertions';
+import openBet from '../openBet';
 import {
-  receiptSelector,
+  cancelledBetsSelector,
+  cancelUnmatchedAboveButtonSelector,
   matchedBetsSelector,
   unmatchedBetsSelector,
-  cancelUnmatchedAboveButtonSelector,
-  receiptBetSizeSelector,
-  openBetsTabSelector,
-  openBetSelector,
   openBetRefIdSelector,
-  cancelledBetsSelector,
+  openBetSelector,
+  openBetsTabSelector,
+  receiptBetSizeSelector,
   unplacedBetsSelector,
 } from '../selectors';
-import { convertToLaySum } from '../coefficientConvertions';
 import { round } from '../util';
+import { getActiveTab } from '../utils';
 
-const enum StakePlaceResult {
-  NOT_PLACED = 0,
-  MATCHED = 1,
-  PARTIAL = 2,
-  UNMATCHED = 3,
-  ERROR = 4,
-}
+let couponLoadingState: string = null;
+let refId: number = null;
 
-let refId = 0;
-let isCancelling = false;
-let loadingCount = 0;
-let openBetsDelay = false;
-let stakePlaceResult = StakePlaceResult.ERROR;
-let partialStakeNoOpenBetsCounter = 0;
-let cancelledUnplaced = false;
+const log = worker.Helper.WriteLine;
 
 export const clearLoadingStakeData = (): void => {
   refId = 0;
-  isCancelling = false;
-  loadingCount = 0;
-  openBetsDelay = false;
-  stakePlaceResult = StakePlaceResult.ERROR;
-  partialStakeNoOpenBetsCounter = 0;
-  cancelledUnplaced = false;
+  couponLoadingState = 'processing';
 };
 
-export const clearLoadingCount = (): void => {
-  loadingCount = 0;
+const getRefId = (): number => {
+  const refIdElement = document.querySelector(openBetRefIdSelector);
+  if (!refIdElement) {
+    log('Не найден RefId ставки');
+    return null;
+  }
+  const refIdMatch = refIdElement.textContent.trim().match(ri`^Ref: (\d+)$`);
+  if (!refIdMatch) {
+    log(`RefId в непонятном формате: ${refIdElement.textContent.trim()}`);
+    return null;
+  }
+  return Number(refIdMatch[1]);
 };
 
 const fakeStake = (stakedSum: number): void => {
@@ -54,320 +49,241 @@ const fakeStake = (stakedSum: number): void => {
   window.stakeData.fakeCoefficient = worker.StakeInfo.Coef;
 };
 
-const getRefId = (): number => {
-  const refIdElement = document.querySelector(openBetRefIdSelector);
-  if (!refIdElement) {
-    worker.Helper.WriteLine('Не найден RefId ставки');
-    window.stakeData.enabled = false;
-    return null;
-  }
-  const refIdMatch = refIdElement.textContent.trim().match(ri`^Ref: (\d+)$`);
-  if (!refIdMatch) {
-    worker.Helper.WriteLine(
-      `RefId в непонятном формате: ${refIdElement.textContent.trim()}`
-    );
-    window.stakeData.enabled = false;
-    return null;
-  }
-  return Number(refIdMatch[1]);
-};
+// ======================================================================================
 
-const getStakePlaceResult = (): StakePlaceResult => {
-  if (document.querySelector(receiptSelector)) {
-    const matchedBets = document.querySelector(matchedBetsSelector);
-    const unmatchedBets = document.querySelector(unmatchedBetsSelector);
-    const unplacedBets = document.querySelector(unplacedBetsSelector);
-    if (matchedBets && !unmatchedBets) {
-      worker.Helper.WriteLine(`matchedBets`);
-      return StakePlaceResult.MATCHED;
-    }
-    if (matchedBets && unmatchedBets) {
-      worker.Helper.WriteLine(`matchedBets && unmatchedBets`);
-      return StakePlaceResult.PARTIAL;
-    }
-    if (!matchedBets && unmatchedBets) {
-      worker.Helper.WriteLine(`unmatchedBets`);
-      return StakePlaceResult.UNMATCHED;
-    }
-    if (unplacedBets) {
-      worker.Helper.WriteLine(`Unplaced Bets`);
-      return StakePlaceResult.UNMATCHED;
-    }
-    worker.Helper.WriteLine(
-      'Ошибка получения результата принятия ставки: Не найдены ни принятые, ни непринятые ставки'
-    );
-    return StakePlaceResult.ERROR;
-  }
-  return StakePlaceResult.ERROR;
-};
+const processingHandler = (): boolean => {
+  const spinner = document.querySelector('bf-spinner');
+  const matchedBets = document.querySelector(matchedBetsSelector);
+  const unmatchedBets = document.querySelector(unmatchedBetsSelector);
+  const unplacedBets = document.querySelector(unplacedBetsSelector);
 
-const isCancelCompleted = (): boolean => {
-  if (document.querySelector(receiptSelector)) {
-    worker.Helper.WriteLine('Receipt');
-    const cancelledBets = document.querySelector(cancelledBetsSelector);
-    const unplacedBets = document.querySelector(unplacedBetsSelector);
-    if (cancelledBets) {
-      worker.Helper.WriteLine('CancelledBets');
-    }
-    if (unplacedBets) {
-      worker.Helper.WriteLine('UnplacedBets');
-    }
-    return Boolean(cancelledBets) || Boolean(unplacedBets);
+  if (spinner) {
+    log('Обработка ставки (индикатор)');
+    return true;
   }
-  return false;
-};
 
-const goToOpenBets = (): boolean => {
-  const openBetsTab = document.querySelector(
-    openBetsTabSelector
-  ) as HTMLElement;
-  if (!openBetsTab) {
-    worker.Helper.WriteLine('Не найдена вкладка открытых ставок');
+  if (matchedBets && unmatchedBets) {
+    log('Обработка ставки завершена (частичная ставка)');
+    worker.TakeScreenShot(false);
+    couponLoadingState = 'unmatched';
+    return true;
+  }
+
+  if (matchedBets) {
+    log('Обработка ставки завершена (ставка принята)');
+    worker.TakeScreenShot(false);
+    window.stakeData.stakePlaced = true;
     return false;
   }
-  openBetsTab.click();
+
+  if (unmatchedBets) {
+    log('Ставка не принята (Unmatched)');
+    worker.TakeScreenShot(false);
+    couponLoadingState = 'unmatched';
+    return true;
+  }
+
+  if (unplacedBets) {
+    log('Ставка не принята (Unplaced)');
+    worker.TakeScreenShot(false);
+    couponLoadingState = 'openBets';
+    return true;
+  }
+
+  log('Обработка ставки (нет индикатора)');
   return true;
 };
 
-const cancellUnmatchedBets = (): boolean => {
+const unmatchedHandler = (): boolean => {
+  refId = getRefId();
   const cancelUnmatchedAboveButton = document.querySelector(
     cancelUnmatchedAboveButtonSelector
   ) as HTMLElement;
   if (!cancelUnmatchedAboveButton) {
-    worker.Helper.WriteLine('Не найдена кнопка отмены ставки');
+    log('Не найдена кнопка отмены ставки');
+    // Отправить информ
     return false;
   }
-  worker.Helper.WriteLine('Нажали на отмену ставки');
+  log('Отменяем ставку');
   cancelUnmatchedAboveButton.click();
-  clearLoadingCount();
+  couponLoadingState = 'cancelling';
   return true;
 };
 
-const getStakedSum = (): number => {
+const cancellingHandler = (): boolean => {
+  const spinner = document.querySelector('bf-spinner');
+  const cancelledBets = document.querySelector(cancelledBetsSelector);
+  const unplacedBets = document.querySelector(unplacedBetsSelector);
+
+  if (spinner) {
+    log('Отмена ставки в процессе (индикатор)');
+    return true;
+  }
+
+  if (cancelledBets) {
+    log('Отмена ставки завершена (Cancelled)');
+    worker.TakeScreenShot(false);
+    couponLoadingState = 'openBets';
+    return true;
+  }
+
+  if (unplacedBets) {
+    log('Отмена ставки завершена (Unplaced)');
+    worker.TakeScreenShot(false);
+    couponLoadingState = 'openBets';
+    return true;
+  }
+
+  log('Отмена ставки в процессе (нет индикатора)');
+  return true;
+};
+
+const openBetsHandler = (): boolean => {
+  const openBetsTab = document.querySelector(
+    openBetsTabSelector
+  ) as HTMLElement;
+  if (!openBetsTab) {
+    log('Не найдена вкладка открытых ставок');
+    // информ ?
+    return false;
+  }
+  log('Переходим на вкладку открытых ставок');
+  openBetsTab.click();
+  couponLoadingState = 'openBetsCheck';
+  return true;
+};
+
+const openBetsCheckHandler = (): boolean => {
+  const activeTab = getActiveTab();
+  if (activeTab !== 'open') {
+    log(`Открыта не вкладка открытых ставок (${activeTab})`);
+    return true;
+  }
+  worker.TakeScreenShot(false);
+  const cancelUnmatchedAboveButton = document.querySelector(
+    cancelUnmatchedAboveButtonSelector
+  ) as HTMLElement;
+  if (cancelUnmatchedAboveButton) {
+    log('Есть неотменённые ставки. Отменяем');
+    cancelUnmatchedAboveButton.click();
+    couponLoadingState = 'cancelling';
+    return true;
+  }
+  couponLoadingState = 'getStakedSum';
+  return true;
+};
+
+const getStakedSumHandler = (): boolean => {
   const openBets = [...document.querySelectorAll(openBetSelector)];
   if (openBets.length === 0) {
-    worker.Helper.WriteLine('Нет ставок в игре');
-    return 0;
+    log('Нет ставок в игре. Считаем ставку не принятой');
+    couponLoadingState = 'reopenBet';
+    return true;
   }
-  console.log('openBets');
-  console.log(openBets);
-  openBets.every((bet) => console.log(bet.outerHTML));
+  if (!refId) {
+    log(
+      'refId текущей ставки не определён, невозможно определить сумму ставок в игре. Считаем ставку непринятой'
+    );
+    // информ ?
+    couponLoadingState = 'reopenBet';
+    return true;
+  }
   const targetBets = openBets.filter((bet) => {
     const refIdElement = bet.querySelector(openBetRefIdSelector);
     if (!refIdElement) {
-      worker.Helper.WriteLine('Не найден refId открытой ставки');
+      log('Не найден refId открытой ставки');
       return false;
     }
     return ri`^Ref: ${String(refId)}$`.test(refIdElement.textContent.trim());
   });
-  console.log('targetBets');
-  console.log(targetBets);
   if (targetBets.length === 0) {
-    worker.Helper.WriteLine(`Нет ставки в игре с refId ${refId}`);
-    return 0;
+    log(`Нет ставкок в игре с refId "${refId}". Считаем ставку не принятой`);
+    couponLoadingState = 'reopenBet';
+    return true;
   }
-  worker.Helper.WriteLine('Есть ставка в игре');
-  const stakeSum = round(
+  log(`Ставок в игре с refId "${refId}": ${targetBets.length}`);
+  const stakedSum = round(
     targetBets.reduce((sum, nextBet, index) => {
       const nextBetSumElement = nextBet.querySelector(receiptBetSizeSelector);
       if (!nextBetSumElement) {
-        worker.Helper.WriteLine(`Не найдена сумма ${index + 1} ставки в игре`);
+        log(`Не найдена сумма ставки в игре (индекс: ${index + 1})`);
         return sum;
       }
       return sum + Number(nextBetSumElement.textContent.slice(1).trim());
     }, 0)
   );
-  worker.Helper.WriteLine(`Сумма ставки в игре: ${stakeSum}`);
-  return stakeSum;
-};
-
-const checkCouponLoading = (): boolean => {
-  if (openBetsDelay) {
-    openBetsDelay = false;
-    const stakedSum = getStakedSum();
-    worker.Helper.WriteLine(
-      `${window.stakeData.isLay ? '(Lay) ' : ''}Ставилось: ${
-        window.stakeData.sum
-      }, поставилось: ${stakedSum}`
-    );
-    if (isCancelling) {
-      isCancelling = false;
-      if (stakedSum === 0) {
-        if (cancelledUnplaced) {
-          worker.Helper.WriteLine(
-            'Ставок в игре нет, но была ошибка Unplaced Bets. Считаем ставку принятой'
-          );
-          window.stakeData.stakePlaced = true;
-          return false;
-        }
-        worker.Helper.WriteLine('Ставка полностью отменилась');
-        window.currentStakeButton.click();
-        window.stakeData.isFake = false; // Могло ли быть true до этого?
-      } else if (stakedSum === window.stakeData.sum) {
-        worker.Helper.WriteLine('Ставка полностью принята');
-        window.stakeData.stakePlaced = true;
-      } else {
-        worker.Helper.WriteLine('Ставка принята частично');
-        fakeStake(stakedSum);
-      }
-      return false;
-    }
-    if (stakePlaceResult === StakePlaceResult.MATCHED) {
-      if (stakedSum !== window.stakeData.sum) {
-        worker.Helper.WriteLine(`${stakedSum} !== ${window.stakeData.sum}`);
-      }
-      window.stakeData.stakePlaced = true;
-      return false;
-    }
-    if (stakePlaceResult === StakePlaceResult.PARTIAL) {
-      if (stakedSum === 0) {
-        if (partialStakeNoOpenBetsCounter === 10) {
-          worker.Helper.WriteLine(
-            'Ставки так и не появились, считаем ставку не сделанной'
-          );
-          return false;
-        }
-        worker.Helper.WriteLine(
-          'Нет ставок, хотя была частичная проставка. Ожидаем ещё'
-        );
-        partialStakeNoOpenBetsCounter += 1;
-        openBetsDelay = true;
-        return true;
-      }
-      if (stakedSum === window.stakeData.sum) {
-        window.stakeData.stakePlaced = true;
-        return false;
-      }
-      fakeStake(stakedSum);
-      if (!cancellUnmatchedBets()) {
-        window.stakeData.enabled = false;
-        return false;
-      }
-      isCancelling = true;
-      return true;
-    }
-    if (stakePlaceResult === StakePlaceResult.ERROR) {
-      if (stakedSum === window.stakeData.sum) {
-        window.stakeData.stakePlaced = true;
-        return false;
-      }
-      fakeStake(stakedSum);
-      if (!cancellUnmatchedBets()) {
-        window.stakeData.enabled = false;
-        return false;
-      }
-      isCancelling = true;
-      return true;
-    }
-  }
-
-  loadingCount += 1;
-
-  if (isCancelling) {
-    if (loadingCount > 200) {
-      worker.Helper.WriteLine('Зависла отмена. Переходим к открытым ставкам');
-      if (!goToOpenBets()) {
-        window.stakeData.enabled = false;
-        return false;
-      }
-      openBetsDelay = true;
-      return true;
-    }
-    const completed = isCancelCompleted();
-    if (!completed) {
-      worker.Helper.WriteLine('Ставка отменяется');
-      return true;
-    }
-    if (document.querySelector(unplacedBetsSelector)) {
-      cancelledUnplaced = true;
-    }
-    worker.Helper.WriteLine(
-      'Отмена ставки завершена. Переходим к открытым ставкам'
-    );
-    worker.TakeScreenShot(false);
-    // isCancelling = false;
-
-    if (!goToOpenBets()) {
-      window.stakeData.enabled = false;
-      return false;
-    }
-    openBetsDelay = true;
+  log(`Сумма ставок в игре: ${stakedSum}`);
+  log(
+    `${window.stakeData.isLay ? '(Lay) ' : ''}Ставилось: ${
+      window.stakeData.sum
+    }, поставилось: ${stakedSum}`
+  );
+  if (stakedSum === 0) {
+    log('Сумма ставок в игре равна 0. Ставка не принята');
+    couponLoadingState = 'reopenBet';
     return true;
   }
-
-  if (window.stakeData.isFake) {
-    return false;
-  }
-
-  stakePlaceResult = getStakePlaceResult();
-  if (stakePlaceResult === StakePlaceResult.ERROR) {
-    if (loadingCount > 200) {
-      worker.Helper.WriteLine(
-        'Зависла обработка. Переходим к открытым ставкам'
-      );
-      worker.TakeScreenShot(false);
-      if (!goToOpenBets()) {
-        window.stakeData.enabled = false;
-        return false;
-      }
-      openBetsDelay = true;
-      return true;
-    }
-    worker.Helper.WriteLine('Обработка ставки');
-    return true;
-  }
-  worker.Helper.WriteLine('Обработка ставки завершена');
-  worker.TakeScreenShot(false);
-  if (stakePlaceResult === StakePlaceResult.MATCHED) {
-    worker.Helper.WriteLine('Ставка принята');
-    refId = getRefId();
-    if (refId) {
-      if (goToOpenBets()) {
-        worker.Helper.WriteLine('Переходим к открытым ставкам');
-        openBetsDelay = true;
-        return true;
-      }
-    } else {
-      worker.Helper.WriteLine('Не найден refId');
-    }
+  if (stakedSum === window.stakeData.sum) {
+    log('Сумма ставок в игре равна совпадает с желаемой. Ставка принята');
     window.stakeData.stakePlaced = true;
     return false;
   }
-  if (stakePlaceResult === StakePlaceResult.UNMATCHED) {
-    if (document.querySelector(unplacedBetsSelector)) {
-      window.currentStakeButton.click();
-      return false;
-    }
-    worker.Helper.WriteLine(`Ставка не принята, отменяем ставку`);
-    refId = getRefId();
-    if (!refId) {
-      worker.Helper.WriteLine('Ошибка определения RefId');
-      window.stakeData.enabled = false;
-      return false;
-    }
-    if (!cancellUnmatchedBets()) {
-      window.stakeData.enabled = false;
-      return false;
-    }
-    isCancelling = true;
+  if (stakedSum > window.stakeData.sum) {
+    log('Сумма ставок в игре больше желаемой. Считаем ставку принятой');
+    // информ
+    window.stakeData.stakePlaced = true;
+    return false;
+  }
+  log('Сумма ставок в игре равна не совпадает. Ставка принята частично');
+  fakeStake(stakedSum);
+  return false;
+};
+
+const reopenBetHandler = (): boolean => {
+  log('Переоткрываем купон');
+  openBet();
+  couponLoadingState = 'reopenBetCheck';
+  return true;
+};
+
+const reopenBetCheckHandler = (): boolean => {
+  if (window.stakeData.openningBet) {
     return true;
   }
-  if (stakePlaceResult === StakePlaceResult.PARTIAL) {
-    worker.Helper.WriteLine(`Ставка принято частично, отменяем остаток`);
-    refId = getRefId();
-    if (!refId) {
-      worker.Helper.WriteLine('Ошибка определения RefId');
-      window.stakeData.enabled = false;
-      return false;
-    }
-    if (!cancellUnmatchedBets()) {
-      window.stakeData.enabled = false;
-      return false;
-    }
-    isCancelling = true;
-    return true;
+  log('Купон переоткрыт');
+  return false;
+};
+
+const checkCouponLoading = (): boolean => {
+  if (window.stakeData.isFake) {
+    return false;
   }
-  worker.Helper.WriteLine(`Неизвестный результат ставки`);
+  if (couponLoadingState === 'processing') {
+    return processingHandler();
+  }
+  if (couponLoadingState === 'unmatched') {
+    return unmatchedHandler();
+  }
+  if (couponLoadingState === 'cancelling') {
+    return cancellingHandler();
+  }
+  if (couponLoadingState === 'openBets') {
+    return openBetsHandler();
+  }
+  if (couponLoadingState === 'openBetsCheck') {
+    return openBetsCheckHandler();
+  }
+  if (couponLoadingState === 'getStakedSum') {
+    return getStakedSumHandler();
+  }
+  if (couponLoadingState === 'reopenBet') {
+    return reopenBetHandler();
+  }
+  if (couponLoadingState === 'reopenBetCheck') {
+    return reopenBetCheckHandler();
+  }
+  log(`Неизвестное состояние обработки (${couponLoadingState})`);
+  log(`Обработка ставки завершена`);
   return false;
 };
 

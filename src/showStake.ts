@@ -1,6 +1,7 @@
-import { getElement, sleep } from '@kot-shrodingera-team/config/util';
-import { updateBalance, getStakeCount } from './getInfo';
+import { getElement } from '@kot-shrodingera-team/config/util';
+import { updateBalance } from './getInfo';
 import { languageCheck, changeLanguage, checkLoginAsync } from './authorize';
+import openBet from './openBet';
 
 const showStake = async (): Promise<void> => {
   if (!(await languageCheck())) {
@@ -10,16 +11,6 @@ const showStake = async (): Promise<void> => {
       worker.JSFail();
     }
     return;
-  }
-  const betData = worker.BetId.split('|');
-  // let isLay = betData[0] === 'True';
-  const betType = betData[0] === 'True' ? 'lay' : 'back';
-  if (betType === 'lay') {
-    worker.Helper.WriteLine('Lay ставка');
-    window.stakeData.isLay = true;
-  } else {
-    worker.Helper.WriteLine('Back ставка');
-    window.stakeData.isLay = false;
   }
   if (!(await checkLoginAsync())) {
     worker.Helper.WriteLine('Ошибка открытия купона: Нет авторизации');
@@ -65,8 +56,6 @@ const showStake = async (): Promise<void> => {
   //     return;
   //   }
   // }
-  const betSelectionId = betData[1];
-  const betHandicap = betData[2] === 'null' ? 0 : betData[2];
   const mainContainer = await getElement('.main-mv-container');
   if (!mainContainer) {
     worker.Helper.WriteLine(
@@ -75,70 +64,32 @@ const showStake = async (): Promise<void> => {
     worker.JSFail();
     return;
   }
-  const betSelectorWithoutHandicap =
-    `[bet-selection-id='${betSelectionId}']` +
-    `[bet-type='${betType}']` +
-    ` > button.${betType}-selection-button`;
-  const betsLoaded = await getElement(betSelectorWithoutHandicap);
-  if (!betsLoaded) {
-    if (!window.currentStakeButton) {
-      worker.Helper.WriteLine('Ошибка открытия купона: Ставка не найдена');
-      worker.JSFail();
-      return;
-    }
+
+  const betData = worker.BetId.split('|');
+  // let isLay = betData[0] === 'True';
+  const betType = betData[0] === 'True' ? 'lay' : 'back';
+  if (betType === 'lay') {
+    worker.Helper.WriteLine('Lay ставка');
+    window.stakeData.isLay = true;
+  } else {
+    worker.Helper.WriteLine('Back ставка');
+    window.stakeData.isLay = false;
   }
-  const betSelectorWithRealHandicap =
+  const betSelectionId = betData[1];
+  const betHandicap = betData[2] === 'null' ? 0 : betData[2];
+  window.stakeData.betSelector =
     `[bet-handicap='${betHandicap}']` +
     `[bet-selection-id='${betSelectionId}']` +
     `[bet-type='${betType}']` +
-    ` > button.${betType}-selection-button`;
-  const betSelectorWithZeroHandicap =
+    ` > button.${betType}-selection-button, ` +
     `[bet-handicap='0']` +
     `[bet-selection-id='${betSelectionId}']` +
     `[bet-type='${betType}']` +
     ` > button.${betType}-selection-button`;
-  window.currentStakeButton =
-    (document.querySelector(betSelectorWithRealHandicap) as HTMLElement) ||
-    (document.querySelector(betSelectorWithZeroHandicap) as HTMLElement);
-  if (!window.currentStakeButton) {
-    worker.Helper.WriteLine('Ошибка открытия купона: Ставка не найдена');
+  if (!(await openBet())) {
     worker.JSFail();
     return;
   }
-  (window.currentStakeButton.parentNode as HTMLElement).style.border =
-    '2px solid red';
-  console.log('currentStakeButton');
-  console.log(window.currentStakeButton);
-  console.log(
-    `price = ${window.currentStakeButton.getAttribute(
-      'price'
-    )}, size = ${window.currentStakeButton.getAttribute('size')}`
-  );
-  if (window.currentStakeButton.getAttribute('price') === '0') {
-    worker.Helper.WriteLine('Коэффициент не появился, ждём ещё секунду');
-    await sleep(1000);
-    console.log(
-      `price = ${window.currentStakeButton.getAttribute(
-        'price'
-      )}, size = ${window.currentStakeButton.getAttribute('size')}`
-    );
-    if (window.currentStakeButton.getAttribute('price') === '0') {
-      worker.Helper.WriteLine(
-        'Ошибка открытия купона: Коэффициент так и не появился'
-      );
-      worker.JSFail();
-      return;
-    }
-  }
-  worker.Helper.WriteLine('Нажимаем на ставку');
-  window.currentStakeButton.click();
-  console.log(`stakeCount = ${getStakeCount()}`);
-  // if (window.stakeData.isNewBetslip) {
-  //   await getElement(liabilitySelector, 1000);
-  // }
-  worker.Helper.WriteLine(
-    `Текущий макс (back): ${window.currentStakeButton.getAttribute('size')}`
-  );
   worker.JSStop();
 };
 
