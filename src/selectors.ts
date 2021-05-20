@@ -23,7 +23,7 @@ export const betNameSelector =
 export const betConfirmCheckboxSelector =
   'input[type="checkbox"][ng-model="$ctrl.verifyBet"], bf-betslip:not(.ng-hide) input[type="checkbox"][ng-model="betslipCtrl.data.betslipContext.preferences.displayConfirmation"]';
 export const submitButtonSelector =
-  '[on-click="$ctrl.onPlaceBetsClick()"] > button, bf-betslip:not(.ng-hide) button[ng-click="potentialsCtrl.events.placeBetsHandler(true)"]';
+  '[on-click="$ctrl.onPlaceBetsClick()"] button[type="submit"], bf-betslip:not(.ng-hide) button[ng-click="potentialsCtrl.events.placeBetsHandler(true)"]';
 export const receiptSelector =
   'receipt, bf-betslip:not(.ng-hide) [subpane-id="RECEIPT"].active';
 export const matchedBetsSelector =
