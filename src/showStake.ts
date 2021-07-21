@@ -76,16 +76,15 @@ const showStake = async (): Promise<void> => {
     window.stakeData.isLay = false;
   }
   const betSelectionId = betData[1];
-  const betHandicap = betData[2] === 'null' ? 0 : betData[2];
   window.stakeData.betSelector =
-    `[bet-handicap='${betHandicap}']` +
-    `[bet-selection-id='${betSelectionId}']` +
-    `[bet-type='${betType}']` +
-    ` > button.${betType}-selection-button, ` +
-    `[bet-handicap='0']` +
-    `[bet-selection-id='${betSelectionId}']` +
-    `[bet-type='${betType}']` +
-    ` > button.${betType}-selection-button`;
+    betData[2] === 'null'
+      ? `[bet-selection-id='${betSelectionId}']` +
+        `[bet-type='${betType}']` +
+        ` > button.${betType}-selection-button`
+      : `[bet-handicap='${betData[2]}']` +
+        `[bet-selection-id='${betSelectionId}']` +
+        `[bet-type='${betType}']` +
+        ` > button.${betType}-selection-button`;
   if (!(await openBet())) {
     worker.JSFail();
     return;
