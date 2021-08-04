@@ -2,6 +2,41 @@ import { getElement } from '@kot-shrodingera-team/config/util';
 import { updateBalance } from './getInfo';
 import { languageCheck, changeLanguage, checkLoginAsync } from './authorize';
 import openBet from './openBet';
+import { balanceElementSelector } from './selectors';
+
+const getSiteCurrency = (): string => {
+  // €9.98
+  const balanceElement = document.querySelector(balanceElementSelector);
+  if (!balanceElement) {
+    return 'Unknown';
+  }
+
+  const balance = balanceElement.textContent.trim();
+
+  if (/^€.*$/.test(balance)) {
+    return 'EUR';
+  }
+
+  if (/^\$.*$/.test(balance)) {
+    return 'USD';
+  }
+
+  return 'Unknown';
+};
+
+const checkCurrency = (siteCurrency: string): boolean => {
+  if (siteCurrency === 'Unknown') {
+    return true;
+  }
+  const botCurrency = worker.Currency;
+  if (siteCurrency !== botCurrency) {
+    worker.Helper.WriteLine(
+      `Не совпадают валюты в боте (${botCurrency}) и на сайте (${siteCurrency})`
+    );
+    return false;
+  }
+  return true;
+};
 
 const showStake = async (): Promise<void> => {
   if (!(await languageCheck())) {
@@ -23,6 +58,12 @@ const showStake = async (): Promise<void> => {
     worker.JSLogined();
   }
   await updateBalance();
+
+  const siteCurrency = getSiteCurrency();
+  if (!checkCurrency(siteCurrency)) {
+    worker.JSFail();
+    return;
+  }
 
   const pageContent = await getElement('.page-content');
   if (!pageContent) {
